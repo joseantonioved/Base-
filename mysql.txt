@@ -40,7 +40,7 @@ CREATE TABLE admin (
 CREATE TABLE cliente (
   id_cliente INT AUTO_INCREMENT PRIMARY KEY,
   id_usuario INT NOT NULL UNIQUE,
-  telefono VARCHAR(20),
+  telefono VARCHAR (10) NOT NULL,
   FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
   ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -51,7 +51,7 @@ CREATE TABLE cliente (
 CREATE TABLE categoria (
   id_categoria INT AUTO_INCREMENT PRIMARY KEY,
   nombre_categoria VARCHAR(120) NOT NULL UNIQUE,
-  descripcion TEXT
+  descripcion VARCHAR (255)
 ) ENGINE=InnoDB;
 
 -- =========================
@@ -189,17 +189,6 @@ CREATE TABLE factura_detalle (
   monto DECIMAL(10,2) NOT NULL,
   FOREIGN KEY (id_factura) REFERENCES facturacion(id_factura)
   ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- =========================
--- PROVEEDOR
--- =========================
-CREATE TABLE proveedor (
-  id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
-  nombre VARCHAR(150) NOT NULL,
-  telefono VARCHAR(50),
-  email VARCHAR(150),
-  direccion VARCHAR(255)
 ) ENGINE=InnoDB;
 
 -- =========================
