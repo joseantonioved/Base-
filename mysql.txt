@@ -1,368 +1,240 @@
--- MySQL Workbench Forward Engineering
-
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+SET @OLD_SQL_MODE=@@SQL_MODE;
+SET SQL_MODE='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
 
--- -----------------------------------------------------
--- Schema mydb
--- -----------------------------------------------------
--- -----------------------------------------------------
--- Schema panaderia
--- -----------------------------------------------------
+DROP SCHEMA IF EXISTS panaderia;
+CREATE SCHEMA panaderia
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------
--- Schema panaderia
--- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `panaderia` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
-USE `panaderia` ;
+USE panaderia;
 
--- -----------------------------------------------------
--- Table `panaderia`.`usuario`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`usuario` (
-  `id_usuario` INT NOT NULL AUTO_INCREMENT,
-  `nombre_usuario` VARCHAR(100) NOT NULL,
-  `contrasena` VARCHAR(255) NOT NULL,
-  `email` VARCHAR(150) NOT NULL,
-  `rol` ENUM('admin', 'empleado', 'cliente') NOT NULL DEFAULT 'cliente',
-  `estado` TINYINT(1) NULL DEFAULT '1',
-  `creado_en` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `telefono` VARCHAR(20) NULL DEFAULT NULL,
-  PRIMARY KEY (`id_usuario`),
-  UNIQUE INDEX `email` (`email` ASC) VISIBLE,
-  UNIQUE INDEX `nombre_usuario` (`nombre_usuario` ASC) VISIBLE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 23
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- USUARIO
+-- =========================
+CREATE TABLE usuario (
+  id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_usuario VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  contrasena VARCHAR(255) NOT NULL,
+  rol ENUM('admin','cliente') NOT NULL,
+  estado TINYINT(1) DEFAULT 1,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
+-- =========================
+-- ADMIN
+-- =========================
+CREATE TABLE admin (
+  id_admin INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL UNIQUE,
+  nivel_acceso TINYINT DEFAULT 1,
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) 
+  ON DELETE CASCADE
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`admin`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`admin` (
-  `id_admin` INT NOT NULL AUTO_INCREMENT,
-  `id_usuario` INT NOT NULL,
-  `nivel_acceso` TINYINT NULL DEFAULT '1',
-  PRIMARY KEY (`id_admin`),
-  INDEX `id_usuario` (`id_usuario` ASC) VISIBLE,
-  CONSTRAINT `admin_ibfk_1`
-    FOREIGN KEY (`id_usuario`)
-    REFERENCES `panaderia`.`usuario` (`id_usuario`)
-    ON DELETE CASCADE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 4
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- CLIENTE
+-- =========================
+CREATE TABLE cliente (
+  id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL UNIQUE,
+  telefono VARCHAR(20),
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+  ON DELETE CASCADE
+) ENGINE=InnoDB;
 
+-- =========================
+-- CATEGORIA
+-- =========================
+CREATE TABLE categoria (
+  id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_categoria VARCHAR(120) NOT NULL UNIQUE,
+  descripcion TEXT
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`categoria`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`categoria` (
-  `id_categoria` INT NOT NULL AUTO_INCREMENT,
-  `nombre_categoria` VARCHAR(120) NOT NULL,
-  `descripcion` TEXT NULL DEFAULT NULL,
-  PRIMARY KEY (`id_categoria`),
-  UNIQUE INDEX `nombre_categoria` (`nombre_categoria` ASC) VISIBLE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 8
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- CATALOGO
+-- =========================
+CREATE TABLE catalogo (
+  id_producto INT AUTO_INCREMENT PRIMARY KEY,
+  id_categoria INT NOT NULL,
+  nombre_producto VARCHAR(150) NOT NULL,
+  descripcion TEXT,
+  unidad_medida VARCHAR(20) DEFAULT 'unidad',
+  precio DECIMAL(10,2) NOT NULL,
+  imagen VARCHAR(500),
+  estado TINYINT(1) DEFAULT 1,
+  FOREIGN KEY (id_categoria) REFERENCES categoria(id_categoria)
+) ENGINE=InnoDB;
 
+-- =========================
+-- INVENTARIO
+-- =========================
+CREATE TABLE inventario (
+  id_inventario INT AUTO_INCREMENT PRIMARY KEY,
+  id_producto INT NOT NULL,
+  stock_actual DECIMAL(12,3) DEFAULT 0,
+  ubicacion VARCHAR(100) DEFAULT 'bodega',
+  fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (id_producto, ubicacion),
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto)
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`catalogo`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`catalogo` (
-  `id_producto` INT NOT NULL AUTO_INCREMENT,
-  `id_categoria` INT NOT NULL,
-  `nombre_producto` VARCHAR(150) NOT NULL,
-  `descripcion` TEXT NULL DEFAULT NULL,
-  `unidad_medida` VARCHAR(20) NULL DEFAULT 'unidad',
-  `precio` DECIMAL(10,2) NOT NULL,
-  `imagen` VARCHAR(500) NULL DEFAULT NULL,
-  `estado` TINYINT(1) NULL DEFAULT '1',
-  PRIMARY KEY (`id_producto`),
-  INDEX `id_categoria` (`id_categoria` ASC) VISIBLE,
-  CONSTRAINT `catalogo_ibfk_1`
-    FOREIGN KEY (`id_categoria`)
-    REFERENCES `panaderia`.`categoria` (`id_categoria`)
-    ON DELETE CASCADE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 8
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- MOVIMIENTO INVENTARIO
+-- =========================
+CREATE TABLE movimiento_inventario (
+  id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+  id_producto INT NOT NULL,
+  tipo_movimiento ENUM('entrada','salida') NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  precio DECIMAL(10,2) NOT NULL,
+  motivo ENUM('venta','produccion','ajuste','merma','devolucion','otro') NOT NULL,
+  fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  id_usuario INT,
+  id_cliente INT,
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto),
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+  FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+) ENGINE=InnoDB;
 
+-- =========================
+-- INVENTARIO ENTRADA
+-- =========================
+CREATE TABLE inventario_entrada (
+  id_entrada INT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento INT NOT NULL,
+  detalle VARCHAR(255),
+  fecha_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_movimiento) REFERENCES movimiento_inventario(id_movimiento)
+  ON DELETE CASCADE
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`cliente`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`cliente` (
-  `id_cliente` INT NOT NULL AUTO_INCREMENT,
-  `id_usuario` INT NULL DEFAULT NULL,
-  `nombre` VARCHAR(120) NOT NULL,
-  `apellido` VARCHAR(120) NULL DEFAULT NULL,
-  `telefono` VARCHAR(30) NULL DEFAULT NULL,
-  `email` VARCHAR(150) NULL DEFAULT NULL,
-  `direccion` VARCHAR(255) NULL DEFAULT NULL,
-  PRIMARY KEY (`id_cliente`),
-  UNIQUE INDEX `id_usuario` (`id_usuario` ASC) VISIBLE,
-  CONSTRAINT `cliente_ibfk_1`
-    FOREIGN KEY (`id_usuario`)
-    REFERENCES `panaderia`.`usuario` (`id_usuario`)
-    ON DELETE SET NULL)
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- INVENTARIO SALIDA
+-- =========================
+CREATE TABLE inventario_salida (
+  id_salida INT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento INT NOT NULL,
+  destino VARCHAR(150),
+  detalle VARCHAR(255),
+  fecha_salida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_movimiento) REFERENCES movimiento_inventario(id_movimiento)
+  ON DELETE CASCADE
+) ENGINE=InnoDB;
 
+-- =========================
+-- VENTA
+-- =========================
+CREATE TABLE venta (
+  id_venta INT AUTO_INCREMENT PRIMARY KEY,
+  id_cliente INT NOT NULL,
+  fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  metodo_pago ENUM('efectivo','tarjeta','transferencia','otro') DEFAULT 'efectivo',
+  estado ENUM('pendiente','completada','anulada') DEFAULT 'pendiente',
+  FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`venta`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`venta` (
-  `id_venta` INT NOT NULL AUTO_INCREMENT,
-  `id_cliente` INT NULL DEFAULT NULL,
-  `id_usuario` INT NULL DEFAULT NULL,
-  `fecha_venta` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  `metodo_pago` ENUM('efectivo', 'tarjeta', 'transferencia', 'otro') NOT NULL DEFAULT 'efectivo',
-  `estado` ENUM('pendiente', 'completada', 'anulada') NULL DEFAULT 'pendiente',
-  PRIMARY KEY (`id_venta`),
-  INDEX `id_cliente` (`id_cliente` ASC) VISIBLE,
-  INDEX `id_usuario` (`id_usuario` ASC) VISIBLE,
-  CONSTRAINT `venta_ibfk_1`
-    FOREIGN KEY (`id_cliente`)
-    REFERENCES `panaderia`.`cliente` (`id_cliente`),
-  CONSTRAINT `venta_ibfk_2`
-    FOREIGN KEY (`id_usuario`)
-    REFERENCES `panaderia`.`usuario` (`id_usuario`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- ENTREGA
+-- =========================
+CREATE TABLE entrega (
+  id_entrega INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL,
+  direccion VARCHAR(255) NOT NULL,
+  estado ENUM('pendiente','en camino','entregado','cancelado') DEFAULT 'pendiente',
+  fecha_programada DATETIME,
+  fecha_entregada DATETIME,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+) ENGINE=InnoDB;
 
+-- =========================
+-- DETALLE VENTA
+-- =========================
+CREATE TABLE detalle_venta (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL,
+  id_producto INT NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  precio_unitario DECIMAL(10,2) NOT NULL,
+  subtotal DECIMAL(10,2)
+  GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+  ON DELETE CASCADE,
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto)
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`detalle_venta`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`detalle_venta` (
-  `id_detalle` INT NOT NULL AUTO_INCREMENT,
-  `id_venta` INT NOT NULL,
-  `id_producto` INT NOT NULL,
-  `cantidad` DECIMAL(12,3) NOT NULL,
-  `precio_unitario` DECIMAL(10,2) NOT NULL,
-  `subtotal` DECIMAL(10,2) GENERATED ALWAYS AS ((`cantidad` * `precio_unitario`)) STORED,
-  PRIMARY KEY (`id_detalle`),
-  INDEX `id_venta` (`id_venta` ASC) VISIBLE,
-  INDEX `id_producto` (`id_producto` ASC) VISIBLE,
-  CONSTRAINT `detalle_venta_ibfk_1`
-    FOREIGN KEY (`id_venta`)
-    REFERENCES `panaderia`.`venta` (`id_venta`)
-    ON DELETE CASCADE,
-  CONSTRAINT `detalle_venta_ibfk_2`
-    FOREIGN KEY (`id_producto`)
-    REFERENCES `panaderia`.`catalogo` (`id_producto`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- FACTURACION
+-- =========================
+CREATE TABLE facturacion (
+  id_factura INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL UNIQUE,
+  numero_factura VARCHAR(50) NOT NULL UNIQUE,
+  fecha_emision TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  impuestos DECIMAL(10,2) DEFAULT 0,
+  total_factura DECIMAL(12,2) NOT NULL,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+) ENGINE=InnoDB;
 
+-- =========================
+-- FACTURA DETALLE
+-- =========================
+CREATE TABLE factura_detalle (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_factura INT NOT NULL,
+  descripcion VARCHAR(255),
+  monto DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (id_factura) REFERENCES facturacion(id_factura)
+  ON DELETE CASCADE
+) ENGINE=InnoDB;
 
--- -----------------------------------------------------
--- Table `panaderia`.`entrega`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`entrega` (
-  `id_entrega` INT NOT NULL AUTO_INCREMENT,
-  `id_venta` INT NOT NULL,
-  `direccion` VARCHAR(255) NOT NULL,
-  `estado` ENUM('pendiente', 'en camino', 'entregado', 'cancelado') NULL DEFAULT 'pendiente',
-  `fecha_programada` DATETIME NULL DEFAULT NULL,
-  `fecha_entregada` DATETIME NULL DEFAULT NULL,
-  PRIMARY KEY (`id_entrega`),
-  INDEX `id_venta` (`id_venta` ASC) VISIBLE,
-  CONSTRAINT `entrega_ibfk_1`
-    FOREIGN KEY (`id_venta`)
-    REFERENCES `panaderia`.`venta` (`id_venta`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+-- =========================
+-- PROVEEDOR
+-- =========================
+CREATE TABLE proveedor (
+  id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(150) NOT NULL,
+  telefono VARCHAR(50),
+  email VARCHAR(150),
+  direccion VARCHAR(255)
+) ENGINE=InnoDB;
 
-
--- -----------------------------------------------------
--- Table `panaderia`.`facturacion`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`facturacion` (
-  `id_factura` INT NOT NULL AUTO_INCREMENT,
-  `id_venta` INT NOT NULL,
-  `numero_factura` VARCHAR(50) NOT NULL,
-  `fecha_emision` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  `impuestos` DECIMAL(10,2) NULL DEFAULT '0.00',
-  `total_factura` DECIMAL(12,2) NOT NULL,
-  PRIMARY KEY (`id_factura`),
-  UNIQUE INDEX `id_venta` (`id_venta` ASC) VISIBLE,
-  UNIQUE INDEX `numero_factura` (`numero_factura` ASC) VISIBLE,
-  CONSTRAINT `facturacion_ibfk_1`
-    FOREIGN KEY (`id_venta`)
-    REFERENCES `panaderia`.`venta` (`id_venta`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`factura_detalle`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`factura_detalle` (
-  `id_detalle` INT NOT NULL AUTO_INCREMENT,
-  `id_factura` INT NOT NULL,
-  `descripcion` VARCHAR(255) NULL DEFAULT NULL,
-  `monto` DECIMAL(10,2) NOT NULL,
-  PRIMARY KEY (`id_detalle`),
-  INDEX `id_factura` (`id_factura` ASC) VISIBLE,
-  CONSTRAINT `factura_detalle_ibfk_1`
-    FOREIGN KEY (`id_factura`)
-    REFERENCES `panaderia`.`facturacion` (`id_factura`)
-    ON DELETE CASCADE)
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`inventario`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`inventario` (
-  `id_inventario` INT NOT NULL AUTO_INCREMENT,
-  `id_producto` INT NOT NULL,
-  `stock_actual` DECIMAL(12,3) NOT NULL DEFAULT '0.000',
-  `ubicacion` VARCHAR(100) NULL DEFAULT 'bodega',
-  `fecha_actualizacion` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id_inventario`),
-  UNIQUE INDEX `id_producto` (`id_producto` ASC, `ubicacion` ASC) VISIBLE,
-  CONSTRAINT `inventario_ibfk_1`
-    FOREIGN KEY (`id_producto`)
-    REFERENCES `panaderia`.`catalogo` (`id_producto`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 4
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`movimiento_inventario`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`movimiento_inventario` (
-  `id_movimiento` INT NOT NULL AUTO_INCREMENT,
-  `id_producto` INT NOT NULL,
-  `tipo_movimiento` ENUM('entrada', 'salida') NOT NULL,
-  `cantidad` DECIMAL(12,3) NOT NULL,
-  `precio` DECIMAL(10,2) NOT NULL,
-  `fecha_movimiento` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  `motivo` ENUM('venta', 'produccion', 'ajuste', 'merma', 'devolucion', 'otro') NOT NULL,
-  `id_usuario` INT NULL DEFAULT NULL,
-  `id_cliente` INT NULL DEFAULT NULL,
-  PRIMARY KEY (`id_movimiento`),
-  INDEX `id_producto` (`id_producto` ASC) VISIBLE,
-  INDEX `id_usuario` (`id_usuario` ASC) VISIBLE,
-  INDEX `id_cliente` (`id_cliente` ASC) VISIBLE,
-  CONSTRAINT `movimiento_inventario_ibfk_1`
-    FOREIGN KEY (`id_producto`)
-    REFERENCES `panaderia`.`catalogo` (`id_producto`),
-  CONSTRAINT `movimiento_inventario_ibfk_2`
-    FOREIGN KEY (`id_usuario`)
-    REFERENCES `panaderia`.`usuario` (`id_usuario`),
-  CONSTRAINT `movimiento_inventario_ibfk_3`
-    FOREIGN KEY (`id_cliente`)
-    REFERENCES `panaderia`.`cliente` (`id_cliente`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`inventario_entrada`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`inventario_entrada` (
-  `id_entrada` INT NOT NULL AUTO_INCREMENT,
-  `id_movimiento` INT NOT NULL,
-  `detalle` VARCHAR(255) NULL DEFAULT NULL,
-  `fecha_entrada` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id_entrada`),
-  INDEX `id_movimiento` (`id_movimiento` ASC) VISIBLE,
-  CONSTRAINT `inventario_entrada_ibfk_1`
-    FOREIGN KEY (`id_movimiento`)
-    REFERENCES `panaderia`.`movimiento_inventario` (`id_movimiento`)
-    ON DELETE CASCADE)
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`inventario_salida`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`inventario_salida` (
-  `id_salida` INT NOT NULL AUTO_INCREMENT,
-  `id_movimiento` INT NOT NULL,
-  `destino` VARCHAR(150) NULL DEFAULT NULL,
-  `detalle` VARCHAR(255) NULL DEFAULT NULL,
-  `fecha_salida` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id_salida`),
-  INDEX `id_movimiento` (`id_movimiento` ASC) VISIBLE,
-  CONSTRAINT `inventario_salida_ibfk_1`
-    FOREIGN KEY (`id_movimiento`)
-    REFERENCES `panaderia`.`movimiento_inventario` (`id_movimiento`)
-    ON DELETE CASCADE)
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `panaderia`.`proveedor`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `panaderia`.`proveedor` (
-  `id_proveedor` INT NOT NULL AUTO_INCREMENT,
-  `nombre` VARCHAR(150) NOT NULL,
-  `telefono` VARCHAR(50) NULL DEFAULT NULL,
-  `email` VARCHAR(150) NULL DEFAULT NULL,
-  `direccion` VARCHAR(255) NULL DEFAULT NULL,
-  PRIMARY KEY (`id_proveedor`))
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-USE `panaderia` ;
-
--- -----------------------------------------------------
--- procedure SP_InsertarNuevoProducto
--- -----------------------------------------------------
-
+-- =========================
+-- PROCEDURE: NUEVO PRODUCTO
+-- =========================
 DELIMITER $$
-USE `panaderia`$$
-CREATE DEFINER=`root`@`localhost` PROCEDURE `SP_InsertarNuevoProducto`(
-    IN p_id_categoria INT,
-    IN p_nombre_producto VARCHAR(150),
-    IN p_descripcion TEXT,
-    IN p_unidad_medida VARCHAR(20),
-    IN p_precio DECIMAL(10,2),
-    IN p_stock_inicial DECIMAL(12,3),
-    IN p_imagen LONGBLOB
+
+CREATE PROCEDURE SP_InsertarNuevoProducto(
+  IN p_id_categoria INT,
+  IN p_nombre_producto VARCHAR(150),
+  IN p_descripcion TEXT,
+  IN p_unidad_medida VARCHAR(20),
+  IN p_precio DECIMAL(10,2),
+  IN p_stock_inicial DECIMAL(12,3),
+  IN p_imagen VARCHAR(500)
 )
 BEGIN
-    DECLARE v_id_producto INT;
-    
-    INSERT INTO catalogo (id_categoria, nombre_producto, descripcion, unidad_medida, precio, imagen)
-    VALUES (p_id_categoria, p_nombre_producto, p_descripcion, p_unidad_medida, p_precio, p_imagen);
-    
-    SET v_id_producto = LAST_INSERT_ID();
-    
-    INSERT INTO inventario (id_producto, stock_actual)
-    VALUES (v_id_producto, p_stock_inicial);
-    
-    INSERT INTO movimiento_inventario (id_producto, tipo_movimiento, cantidad, precio, motivo)
-    VALUES (v_id_producto, 'entrada', p_stock_inicial, p_precio, 'ajuste');
-    
-    SELECT v_id_producto AS id_producto_creado;
+  DECLARE v_id_producto INT;
+
+  INSERT INTO catalogo
+    (id_categoria, nombre_producto, descripcion, unidad_medida, precio, imagen)
+  VALUES
+    (p_id_categoria, p_nombre_producto, p_descripcion, p_unidad_medida, p_precio, p_imagen);
+
+  SET v_id_producto = LAST_INSERT_ID();
+
+  INSERT INTO inventario (id_producto, stock_actual)
+  VALUES (v_id_producto, p_stock_inicial);
+
+  INSERT INTO movimiento_inventario
+    (id_producto, tipo_movimiento, cantidad, precio, motivo)
+  VALUES
+    (v_id_producto, 'entrada', p_stock_inicial, p_precio, 'ajuste');
+
+  SELECT v_id_producto AS id_producto_creado;
 END$$
 
 DELIMITER ;
@@ -370,4 +242,3 @@ DELIMITER ;
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
-
