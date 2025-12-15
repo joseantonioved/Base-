@@ -1,0 +1,249 @@
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
+
+DROP SCHEMA IF EXISTS panaderia;
+CREATE SCHEMA panaderia
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_0900_ai_ci;
+
+USE panaderia;
+
+-- =========================
+-- USUARIO
+-- =========================
+CREATE TABLE usuario (
+  id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_usuario VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  contrasena VARCHAR(255) NOT NULL,
+  rol ENUM('admin', 'cliente') NOT NULL,
+  estado TINYINT(1) DEFAULT 1,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- =========================
+-- ADMIN
+-- =========================
+CREATE TABLE admin (
+  id_admin INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL UNIQUE,
+  nivel_acceso TINYINT DEFAULT 1,
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =========================
+-- CLIENTE
+-- =========================
+CREATE TABLE cliente (
+  id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL UNIQUE,
+  telefono VARCHAR(10) NOT NULL,
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =========================
+-- CARRITO
+-- =========================
+CREATE TABLE carrito (
+  id_carrito INT AUTO_INCREMENT PRIMARY KEY,
+  id_cliente INT NOT NULL,
+  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  estado ENUM('activo','finalizado','cancelado') DEFAULT 'activo',
+  FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+) ENGINE=InnoDB;
+
+-- =========================
+-- CATEGORIA
+-- =========================
+CREATE TABLE categoria (
+  id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_categoria VARCHAR(120) NOT NULL UNIQUE,
+  descripcion VARCHAR(255)
+) ENGINE=InnoDB;
+
+-- =========================
+-- CATALOGO
+-- =========================
+CREATE TABLE catalogo (
+  id_producto INT AUTO_INCREMENT PRIMARY KEY,
+  id_categoria INT NOT NULL,
+  nombre_producto VARCHAR(150) NOT NULL,
+  descripcion TEXT,
+  unidad_medida VARCHAR(20) DEFAULT 'unidad',
+  precio DECIMAL(10,2) NOT NULL,
+  imagen VARCHAR(500),
+  estado TINYINT(1) DEFAULT 1,
+  FOREIGN KEY (id_categoria) REFERENCES categoria(id_categoria)
+) ENGINE=InnoDB;
+
+-- =========================
+-- CARRITO DETALLE
+-- =========================
+CREATE TABLE carrito_detalle (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_carrito INT NOT NULL,
+  id_producto INT NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  precio_unitario DECIMAL(10,2) NOT NULL,
+  subtotal DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+  FOREIGN KEY (id_carrito) REFERENCES carrito(id_carrito) ON DELETE CASCADE,
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto)
+) ENGINE=InnoDB;
+
+-- =========================
+-- VENTA
+-- =========================
+CREATE TABLE venta (
+  id_venta INT AUTO_INCREMENT PRIMARY KEY,
+  id_cliente INT NOT NULL,
+  fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  metodo_pago ENUM('efectivo','tarjeta','transferencia','otro') DEFAULT 'efectivo',
+  estado ENUM('pendiente','completada','anulada') DEFAULT 'pendiente',
+  FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+) ENGINE=InnoDB;
+
+-- =========================
+-- DETALLE VENTA
+-- =========================
+CREATE TABLE detalle_venta (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL,
+  id_producto INT NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  precio_unitario DECIMAL(10,2) NOT NULL,
+  subtotal DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta) ON DELETE CASCADE,
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto)
+) ENGINE=InnoDB;
+
+-- =========================
+-- ENTREGA
+-- =========================
+CREATE TABLE entrega (
+  id_entrega INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL,
+  direccion VARCHAR(255) NOT NULL,
+  estado ENUM('pendiente','en camino','entregado','cancelado') DEFAULT 'pendiente',
+  fecha_programada DATETIME,
+  fecha_entregada DATETIME,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+) ENGINE=InnoDB;
+
+-- =========================
+-- FACTURACION
+-- =========================
+CREATE TABLE facturacion (
+  id_factura INT AUTO_INCREMENT PRIMARY KEY,
+  id_venta INT NOT NULL UNIQUE,
+  numero_factura VARCHAR(50) NOT NULL UNIQUE,
+  fecha_emision TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  impuestos DECIMAL(10,2) DEFAULT 0,
+  total_factura DECIMAL(12,2) NOT NULL,
+  FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+) ENGINE=InnoDB;
+
+-- =========================
+-- FACTURA DETALLE
+-- =========================
+CREATE TABLE factura_detalle (
+  id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+  id_factura INT NOT NULL,
+  descripcion VARCHAR(255),
+  monto DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (id_factura) REFERENCES facturacion(id_factura) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =========================
+-- INVENTARIO
+-- =========================
+CREATE TABLE inventario (
+  id_inventario INT AUTO_INCREMENT PRIMARY KEY,
+  id_producto INT NOT NULL,
+  stock_actual DECIMAL(12,3) DEFAULT 0,
+  ubicacion VARCHAR(100) DEFAULT 'bodega',
+  fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(id_producto, ubicacion),
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto)
+) ENGINE=InnoDB;
+
+-- =========================
+-- MOVIMIENTO INVENTARIO
+-- =========================
+CREATE TABLE movimiento_inventario (
+  id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+  id_producto INT NOT NULL,
+  tipo_movimiento ENUM('entrada','salida') NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  precio DECIMAL(10,2) NOT NULL,
+  motivo ENUM('venta','produccion','ajuste','merma','devolucion','otro') NOT NULL,
+  fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  id_usuario INT,
+  id_cliente INT,
+  FOREIGN KEY (id_producto) REFERENCES catalogo(id_producto),
+  FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+  FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+) ENGINE=InnoDB;
+
+-- =========================
+-- INVENTARIO ENTRADA
+-- =========================
+CREATE TABLE inventario_entrada (
+  id_entrada INT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento INT NOT NULL,
+  detalle VARCHAR(255),
+  fecha_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_movimiento) REFERENCES movimiento_inventario(id_movimiento) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =========================
+-- INVENTARIO SALIDA
+-- =========================
+CREATE TABLE inventario_salida (
+  id_salida INT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento INT NOT NULL,
+  destino VARCHAR(150),
+  detalle VARCHAR(255),
+  fecha_salida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_movimiento) REFERENCES movimiento_inventario(id_movimiento) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =========================
+-- PROCEDURES
+-- =========================
+DELIMITER $$
+CREATE PROCEDURE SP_ActualizarCantidadCarrito(
+    IN p_id_cliente INT,
+    IN p_id_producto INT,
+    IN p_cantidad DECIMAL(12,3)
+)
+BEGIN
+    DECLARE v_id_carrito INT;
+    SELECT id_carrito INTO v_id_carrito
+    FROM carrito
+    WHERE id_cliente = p_id_cliente AND estado = 'activo'
+    LIMIT 1;
+
+    IF v_id_carrito IS NOT NULL THEN
+        IF p_cantidad > 0 THEN
+            UPDATE carrito_detalle
+            SET cantidad = p_cantidad
+            WHERE id_carrito = v_id_carrito AND id_producto = p_id_producto;
+        ELSE
+            DELETE FROM carrito_detalle
+            WHERE id_carrito = v_id_carrito AND id_producto = p_id_producto;
+        END IF;
+    END IF;
+END$$
+
+CREATE PROCEDURE SP_AgregarAlCarrito(
+    IN p_id_cliente INT,
+    IN p_id_producto INT,
+    IN p_cantidad DECIMAL(12,3)
+)
+BEGIN
+    DECLARE v_id_carrito INT;
+    SELECT id_carrito INTO v_id_carrito
+    FROM carrito
+    WHERE id_cliente = p_id_cliente AND estado = 'activo'
+    LIMI
