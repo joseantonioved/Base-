@@ -246,4 +246,4 @@ BEGIN
     SELECT id_carrito INTO v_id_carrito
     FROM carrito
     WHERE id_cliente = p_id_cliente AND estado = 'activo'
-    LIMI
+    LIMIT
